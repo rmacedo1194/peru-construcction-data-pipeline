@@ -1,0 +1,18 @@
+{
+  "source_id": "peru-open-data",
+  "dataset_id": "licencias-construccion-lima",
+  "resource_id": "dataset-page-html",
+  "ingestion_id": "2026-04-03T10:00:00Z",
+  "request": {
+    "kind": "url",
+    "url": "https://www.datosabiertos.gob.pe/dataset/licencias-de-construccion",
+    "method": "GET",
+    "headers": {
+      "Referer": "https://www.datosabiertos.gob.pe/dataset"
+    }
+  },
+  "metadata": {
+    "source_page": "https://www.datosabiertos.gob.pe/dataset",
+    "notes": "Trusted HTML dataset page used to validate the Lambda request posture before direct file ingestion is added."
+  }
+}

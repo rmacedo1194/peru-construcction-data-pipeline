@@ -1,0 +1,63 @@
+name: Deploy Dev
+
+on:
+  # Manual dispatch is the safest default for a learning project with
+  # short-lived stacks and deliberate create-run-destroy cycles.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # GitHub needs OIDC token minting permission to assume the AWS deploy role
+  # without storing long-lived AWS keys in repository secrets.
+  id-token: write
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-2
+  AWS_DEFAULT_REGION: us-east-2
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Set up AWS SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Install test dependency
+        run: python -m pip install --upgrade pip pytest
+
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Validate SAM template
+        run: sam validate --template-file infra/cloudformation/raw_ingestion_template.yaml
+
+      - name: Build SAM application
+        run: sam build --template-file infra/cloudformation/raw_ingestion_template.yaml
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::380592535850:role/github-actions-deploy-role
+          role-session-name: github-actions-raw-ingestion-dev
+
+      - name: Deploy dev stack
+        run: |
+          sam deploy \
+            --config-env dev \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset

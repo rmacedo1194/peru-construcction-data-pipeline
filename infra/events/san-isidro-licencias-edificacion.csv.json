@@ -1,0 +1,21 @@
+{
+  "source_id": "peru-open-data",
+  "dataset_id": "san-isidro-licencias-edificacion",
+  "resource_id": "san-isidro-licencias-csv",
+  "ingestion_id": "2026-04-04T12:10:00Z",
+  "request": {
+    "kind": "url",
+    "url": "https://www.datosabiertos.gob.pe/sites/default/files/licencias_de_edificacion.csv",
+    "method": "GET",
+    "headers": {
+      "Referer": "https://www.datosabiertos.gob.pe/dataset/mdsi-licencias-de-edificacion-autorizacion-y-control"
+    }
+  },
+  "metadata": {
+    "dataset_page_url": "https://www.datosabiertos.gob.pe/dataset/mdsi-licencias-de-edificacion-autorizacion-y-control",
+    "scope": "San Isidro",
+    "publisher": "Municipalidad de San Isidro",
+    "signal_type": "permit_issuance",
+    "notes": "District-level Lima permit source used as a richer comparison series against MML."
+  }
+}

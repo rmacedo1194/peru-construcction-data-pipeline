@@ -1,0 +1,21 @@
+{
+  "source_id": "peru-open-data",
+  "dataset_id": "mml-conformidad-obra-declaratoria-edificacion",
+  "resource_id": "cercado-lima-conformidad-csv",
+  "ingestion_id": "2026-04-04T12:05:00Z",
+  "request": {
+    "kind": "url",
+    "url": "https://www.datosabiertos.gob.pe/sites/default/files/DATASET%20CONFORMIDAD%20Y%20DECLARATORIA%20DE%20FABRICA%20EMITIDOS%20050125.csv",
+    "method": "GET",
+    "headers": {
+      "Referer": "https://www.datosabiertos.gob.pe/dataset/conformidad-de-obra-y-declaratoria-de-edificaci%C3%B3n-municipalidad-metropolitana-de-lima"
+    }
+  },
+  "metadata": {
+    "dataset_page_url": "https://www.datosabiertos.gob.pe/dataset/conformidad-de-obra-y-declaratoria-de-edificaci%C3%B3n-municipalidad-metropolitana-de-lima",
+    "scope": "Cercado de Lima",
+    "publisher": "Municipalidad Metropolitana de Lima",
+    "signal_type": "construction_completion_or_formalization",
+    "notes": "Companion MML source used to compare completions against issued licenses."
+  }
+}

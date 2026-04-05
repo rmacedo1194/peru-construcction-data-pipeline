@@ -1,0 +1,39 @@
+version = 0.1
+
+[default.global.parameters]
+region = "us-east-2"
+
+[default.build.parameters]
+template_file = "infra/cloudformation/raw_ingestion_template.yaml"
+cached = true
+parallel = true
+
+[default.validate.parameters]
+template_file = "infra/cloudformation/raw_ingestion_template.yaml"
+lint = false
+
+[default.local_invoke.parameters]
+template_file = "infra/cloudformation/raw_ingestion_template.yaml"
+env_vars = "infra/parameters/sam-local-env.json"
+event = "infra/events/html-dataset-page.json"
+
+[default.deploy.parameters]
+template_file = "infra/cloudformation/raw_ingestion_template.yaml"
+stack_name = "peru-construction-raw-ingestion-dev"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+fail_on_empty_changeset = false
+
+# The named dev config gives CI/CD an explicit deployment target instead of
+# relying on the implicit default environment.
+[dev.global.parameters]
+region = "us-east-2"
+
+[dev.deploy.parameters]
+template_file = "infra/cloudformation/raw_ingestion_template.yaml"
+stack_name = "peru-construction-raw-ingestion-dev"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true
+resolve_s3 = true
+fail_on_empty_changeset = false

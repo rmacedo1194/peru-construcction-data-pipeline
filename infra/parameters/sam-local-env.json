@@ -1,0 +1,10 @@
+{
+  "RawIngestionFunction": {
+    "RAW_BUCKET_NAME": "local-raw-ingestion-bucket",
+    "RAW_PREFIX": "raw",
+    "SOURCE_NAME": "peru-open-data",
+    "REQUEST_TIMEOUT": "30",
+    "STORAGE_BACKEND": "filesystem",
+    "LOCAL_OUTPUT_DIR": "/tmp/sam-local-output"
+  }
+}

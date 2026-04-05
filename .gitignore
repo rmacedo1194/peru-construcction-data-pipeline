@@ -1,2 +1,13 @@
-datos.py
+# Python caches and local virtualenvs
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+
+# macOS Finder metadata
+.DS_Store
+
+# Local SAM build and runtime output
+.sam-local-output/
+.aws-sam/

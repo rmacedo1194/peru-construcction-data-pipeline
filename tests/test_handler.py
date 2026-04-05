@@ -1,20 +1,176 @@
-import os
+from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
+from app.lambda_app.config import Settings
 from app.lambda_app.handler import lambda_handler
+from app.lambda_app.models import (
+    EventValidationError,
+    FetchResult,
+    IngestionEvent,
+    StoragePaths,
+)
+from app.lambda_app.storage import (
+    FilesystemStorageWriter,
+    S3StorageWriter,
+    build_manifest,
+    build_storage_paths,
+    create_storage_writer,
+)
 
 
-def test_lambda_handler():
-    os.environ["API_BASE_URL"] = "https://example.com/api"
-    os.environ["RAW_BUCKET_NAME"] = "demo-raw-bucket"
-    os.environ["SOURCE_NAME"] = "peru_construction"
-    os.environ["REQUEST_TIMEOUT"] = "30"
+@pytest.fixture(autouse=True)
+def _set_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAW_BUCKET_NAME", "demo-raw-bucket")
+    monkeypatch.setenv("RAW_PREFIX", "raw")
+    monkeypatch.setenv("SOURCE_NAME", "peru-open-data")
+    monkeypatch.setenv("REQUEST_TIMEOUT", "30")
 
-    event = {
-        "dataset": "peru_construction_licenses"
+
+def sample_event() -> dict[str, object]:
+    return {
+        "dataset_id": "licencias-construccion-lima",
+        "resource_id": "dataset-page-html",
+        "ingestion_id": "2026-04-03T10:00:00Z",
+        "request": {
+            "kind": "url",
+            "url": "https://www.datosabiertos.gob.pe/dataset/licencias-de-construccion",
+            "headers": {
+                "Referer": "https://www.datosabiertos.gob.pe/dataset",
+            },
+        },
+        "metadata": {
+            "source_page": "https://www.datosabiertos.gob.pe/dataset",
+            "notes": "Portal catalogue and dataset pages return HTML.",
+        },
     }
 
-    response = lambda_handler(event, None)
+
+def sample_fetch_result() -> FetchResult:
+    return FetchResult(
+        body=b"<html>ok</html>",
+        final_url="https://www.datosabiertos.gob.pe/dataset/licencias-de-construccion",
+        status_code=200,
+        content_type="text/html; charset=utf-8",
+        content_length=15,
+        etag="etag-123",
+        checksum_sha256="abc123",
+        fetched_at="2026-04-03T10:00:04Z",
+        response_headers={"Content-Type": "text/html; charset=utf-8"},
+    )
+
+
+def build_ingestion_event() -> IngestionEvent:
+    return IngestionEvent.from_dict(
+        sample_event(),
+        default_source_id="peru-open-data",
+        default_bucket="demo-raw-bucket",
+        default_prefix="raw",
+    )
+
+
+def test_lambda_handler_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    puts: list[dict[str, object]] = []
+
+    class FakeS3Client:
+        def put_object(self, **kwargs):
+            puts.append(kwargs)
+
+    monkeypatch.setattr("app.lambda_app.handler.fetch_request", lambda request, settings: sample_fetch_result())
+    monkeypatch.setattr("app.lambda_app.storage.create_s3_client", lambda: FakeS3Client())
+
+    response = lambda_handler(sample_event(), None)
 
     assert response["status"] == "success"
-    assert response["dataset"] == "peru_construction_licenses"
-    assert "demo-raw-bucket" in response["message"]
+    assert response["dataset_id"] == "licencias-construccion-lima"
+    assert response["resource_id"] == "dataset-page-html"
+    assert response["bucket"] == "demo-raw-bucket"
+    assert response["raw_key"].endswith("/payload.html")
+    assert response["manifest_key"].endswith("/manifest.json")
+    assert len(puts) == 2
+    manifest_payload = json.loads(puts[1]["Body"].decode("utf-8"))
+    assert manifest_payload["source_metadata"]["source_page"] == "https://www.datosabiertos.gob.pe/dataset"
+
+
+def test_event_validation_requires_ingestion_id() -> None:
+    invalid_event = sample_event()
+    invalid_event.pop("ingestion_id")
+
+    with pytest.raises(EventValidationError):
+        lambda_handler(invalid_event, None)
+
+
+def test_build_storage_paths_is_deterministic_for_html_payloads() -> None:
+    paths = build_storage_paths(build_ingestion_event(), sample_fetch_result())
+
+    assert paths.bucket == "demo-raw-bucket"
+    assert (
+        paths.raw_key
+        == "raw/peru-open-data/licencias-construccion-lima/dataset-page-html/2026/04/03/2026-04-03t10-00-00z/payload.html"
+    )
+    assert (
+        paths.manifest_key
+        == "raw/peru-open-data/licencias-construccion-lima/dataset-page-html/2026/04/03/2026-04-03t10-00-00z/manifest.json"
+    )
+
+
+def test_manifest_keeps_traceability_fields() -> None:
+    storage_paths = StoragePaths(
+        bucket="demo-raw-bucket",
+        raw_key="raw/peru-open-data/licencias-construccion-lima/dataset-page-html/2026/04/03/run-1/payload.html",
+        manifest_key="raw/peru-open-data/licencias-construccion-lima/dataset-page-html/2026/04/03/run-1/manifest.json",
+    )
+    manifest = build_manifest(
+        event=build_ingestion_event(),
+        fetch_result=sample_fetch_result(),
+        storage_paths=storage_paths,
+    )
+
+    assert manifest.requested_url == "https://www.datosabiertos.gob.pe/dataset/licencias-de-construccion"
+    assert manifest.raw_s3_key.endswith("/payload.html")
+    assert manifest.manifest_s3_key.endswith("/manifest.json")
+    assert manifest.content_type == "text/html; charset=utf-8"
+
+
+def test_create_storage_writer_uses_filesystem_backend(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("STORAGE_BACKEND", "filesystem")
+    monkeypatch.setenv("LOCAL_OUTPUT_DIR", str(tmp_path))
+
+    writer = create_storage_writer(Settings.from_env())
+
+    assert isinstance(writer, FilesystemStorageWriter)
+
+
+def test_create_storage_writer_uses_s3_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake_client = object()
+    monkeypatch.delenv("STORAGE_BACKEND", raising=False)
+    monkeypatch.setattr("app.lambda_app.storage.create_s3_client", lambda: fake_client)
+
+    writer = create_storage_writer(Settings.from_env())
+
+    assert isinstance(writer, S3StorageWriter)
+    assert writer._s3_client is fake_client
+
+
+def test_filesystem_storage_writer_mirrors_s3_layout(tmp_path: Path) -> None:
+    storage_paths = build_storage_paths(build_ingestion_event(), sample_fetch_result())
+    manifest = build_manifest(
+        event=build_ingestion_event(),
+        fetch_result=sample_fetch_result(),
+        storage_paths=storage_paths,
+    )
+    writer = FilesystemStorageWriter(tmp_path)
+
+    writer.write_raw_payload(storage_paths, sample_fetch_result())
+    writer.write_manifest(storage_paths, manifest)
+
+    raw_path = tmp_path / storage_paths.bucket / Path(storage_paths.raw_key)
+    manifest_path = tmp_path / storage_paths.bucket / Path(storage_paths.manifest_key)
+
+    assert raw_path.read_bytes() == b"<html>ok</html>"
+    manifest_payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest_payload["raw_s3_key"] == storage_paths.raw_key
+    assert manifest_payload["manifest_s3_key"] == storage_paths.manifest_key

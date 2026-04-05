@@ -1,0 +1,21 @@
+{
+  "source_id": "peru-open-data",
+  "dataset_id": "mml-resoluciones-licencias-edificacion",
+  "resource_id": "cercado-lima-licencias-csv",
+  "ingestion_id": "2026-04-04T12:00:00Z",
+  "request": {
+    "kind": "url",
+    "url": "https://www.datosabiertos.gob.pe/sites/default/files/DATASET%20RESOLUCION%20DE%20LICENCIAS%20DE%20EDIFICACION%20MOD%20A%2CB%2CC%2CD.csv",
+    "method": "GET",
+    "headers": {
+      "Referer": "https://www.datosabiertos.gob.pe/dataset/resoluciones-de-licencias-de-edificaci%C3%B3n-municipalidad-metropolitana-de-lima"
+    }
+  },
+  "metadata": {
+    "dataset_page_url": "https://www.datosabiertos.gob.pe/dataset/resoluciones-de-licencias-de-edificaci%C3%B3n-municipalidad-metropolitana-de-lima",
+    "scope": "Cercado de Lima",
+    "publisher": "Municipalidad Metropolitana de Lima",
+    "signal_type": "permit_issuance",
+    "notes": "Primary MML construction permit source for raw-ingestion testing."
+  }
+}
