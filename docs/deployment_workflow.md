@@ -121,9 +121,12 @@ CloudFormation
    ↓
 Creates/updates:
 - Lambda function
-- S3 raw bucket
 - IAM execution role
 - CloudWatch log group
+
+Uses:
+- Shared raw/bronze S3 bucket (`bronze-rmm`)
+- SAM-managed artifact bucket for deployment packaging
 ```
 
 ---
@@ -147,16 +150,11 @@ After deployment, validate:
 
 - `dev`
 
-### Future
-
-- `staging`
-- `prod`
-
 Recommended path:
 
 - Start with one clean `dev` environment
-- Stabilize the contract
-- Then add promotion flow for additional environments
+- Use short-lived create-run-destroy cycles while learning
+- Stabilize the contract before adding more environments
 
 ---
 
@@ -218,7 +216,7 @@ Use this separation of concerns:
 Later, this workflow can evolve with:
 
 - GitHub OIDC for secure AWS authentication
-- Separate deploy jobs for `dev`, `staging`, and `prod`
+- Separate deploy jobs for additional environments only if the project later needs them
 - Approval gates before production deploy
 - CloudWatch alarms
 - Log retention policies

@@ -24,6 +24,7 @@ capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
 fail_on_empty_changeset = false
+parameter_overrides = "RawBucketName=bronze-rmm"
 
 # The named dev config gives CI/CD an explicit deployment target instead of
 # relying on the implicit default environment.
@@ -37,3 +38,4 @@ capabilities = "CAPABILITY_IAM"
 confirm_changeset = true
 resolve_s3 = true
 fail_on_empty_changeset = false
+parameter_overrides = "RawBucketName=bronze-rmm"

@@ -18,7 +18,9 @@
 - [ ] Add a GitHub Actions CI workflow that runs tests plus `sam validate` and `sam build`
 - [x] Add a GitHub Actions CD workflow for `dev` deployments using `sam deploy`
 - [ ] Define GitHub-to-AWS authentication with a dedicated deploy role and GitHub OIDC
-- [ ] Define environment configuration strategy for `dev` stack names, region, tags, and SAM parameters
+- [x] Define environment configuration strategy for `dev` stack names, region, tags, and SAM parameters
+- [ ] Re-deploy the raw-ingestion stack to target the shared `bronze-rmm` bucket instead of the stack-managed raw bucket
+- [ ] Clean up the old stack-managed raw bucket after confirming data lands in `bronze-rmm`
 - [ ] Add post-deploy smoke validation for Lambda invoke plus raw object and manifest checks
 - [ ] Document the AWS account bootstrap for the first `dev` environment
 

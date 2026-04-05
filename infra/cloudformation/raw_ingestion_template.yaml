@@ -6,6 +6,12 @@ Parameters:
   SourceName:
     Type: String
     Default: peru-open-data
+  # This stack writes into an existing shared raw/bronze bucket instead of
+  # creating a service-specific bucket. That keeps storage lifecycle separate
+  # from one Lambda stack and makes reuse across services easier.
+  RawBucketName:
+    Type: String
+    Default: bronze-rmm
   RawPrefix:
     Type: String
     Default: raw
@@ -23,31 +29,20 @@ Parameters:
     Default: .sam-local-output
 
 Resources:
-  RawBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-
   RawIngestionFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: !Sub "${AWS::StackName}-raw-ingestion"
-      CodeUri: ../../
-      Handler: app.lambda_app.handler.lambda_handler
+      # Package only the application directory so docs, learning notes, and
+      # exploration files do not get bundled into the Lambda artifact.
+      CodeUri: ../../app
+      Handler: lambda_app.handler.lambda_handler
       Runtime: python3.14
       MemorySize: 512
       Timeout: 60
       Environment:
         Variables:
-          RAW_BUCKET_NAME: !Ref RawBucket
+          RAW_BUCKET_NAME: !Ref RawBucketName
           RAW_PREFIX: !Ref RawPrefix
           SOURCE_NAME: !Ref SourceName
           REQUEST_TIMEOUT: !Ref RequestTimeout
@@ -60,12 +55,12 @@ Resources:
               Effect: Allow
               Action:
                 - s3:PutObject
-              Resource: !Sub "${RawBucket.Arn}/*"
+              Resource: !Sub "arn:${AWS::Partition}:s3:::${RawBucketName}/*"
 
 Outputs:
   RawIngestionFunctionName:
     Description: Name of the raw-ingestion Lambda function.
     Value: !Ref RawIngestionFunction
   RawBucketName:
-    Description: Name of the raw-ingestion S3 bucket.
-    Value: !Ref RawBucket
+    Description: Name of the shared raw-ingestion S3 bucket.
+    Value: !Ref RawBucketName
