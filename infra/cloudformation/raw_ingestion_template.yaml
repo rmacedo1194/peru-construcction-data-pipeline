@@ -14,7 +14,7 @@ Parameters:
     Default: bronze-rmm
   RawPrefix:
     Type: String
-    Default: raw
+    Default: ""
   RequestTimeout:
     Type: Number
     Default: 30

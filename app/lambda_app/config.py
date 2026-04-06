@@ -47,7 +47,7 @@ class Settings:
 
         return cls(
             raw_bucket_name=raw_bucket_name,
-            raw_prefix=os.getenv("RAW_PREFIX", "raw").strip("/") or "raw",
+            raw_prefix=os.getenv("RAW_PREFIX", "").strip("/"),
             source_name=os.getenv("SOURCE_NAME", "peru-open-data").strip() or "peru-open-data",
             request_timeout=request_timeout,
             user_agent=os.getenv("REQUEST_USER_AGENT", DEFAULT_USER_AGENT).strip() or DEFAULT_USER_AGENT,

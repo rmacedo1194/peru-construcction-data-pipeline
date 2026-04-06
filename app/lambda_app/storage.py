@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import mimetypes
 import re
 import unicodedata
@@ -8,7 +7,7 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import urlparse
 
 from .config import Settings
-from .models import FetchResult, IngestionEvent, IngestionManifest, StoragePaths, parse_ingestion_id
+from .models import FetchResult, IngestionEvent, StoragePaths, parse_ingestion_id
 
 CONTENT_TYPE_EXTENSION_OVERRIDES = {
     "text/csv": ".csv",
@@ -16,7 +15,6 @@ CONTENT_TYPE_EXTENSION_OVERRIDES = {
     "application/json": ".json",
     "application/xml": ".xml",
 }
-SENSITIVE_HEADERS = {"authorization", "cookie", "x-api-key"}
 
 
 class StorageError(RuntimeError):
@@ -29,60 +27,22 @@ class StorageWriter:
     def write_raw_payload(self, storage_paths: StoragePaths, fetch_result: FetchResult) -> None:
         raise NotImplementedError
 
-    def write_manifest(self, storage_paths: StoragePaths, manifest: IngestionManifest) -> None:
-        raise NotImplementedError
-
 
 def build_storage_paths(event: IngestionEvent, fetch_result: FetchResult) -> StoragePaths:
     ingested_at = parse_ingestion_id(event.ingestion_id)
-    # Deterministic keys make retries path-idempotent: the same ingestion identifiers
-    # overwrite the same objects instead of creating duplicate raw artifacts.
-    base_key = "/".join(
-        [
-            sanitize_path_segment(event.storage.prefix),
-            sanitize_path_segment(event.source_id),
-            sanitize_path_segment(event.dataset_id),
-            sanitize_path_segment(event.resource_id),
-            ingested_at.strftime("%Y"),
-            ingested_at.strftime("%m"),
-            ingested_at.strftime("%d"),
-            sanitize_path_segment(event.ingestion_id),
-        ]
-    )
     extension = detect_extension(fetch_result.final_url, fetch_result.content_type)
+    # Keep the bronze layer easy to browse: one source folder and one dated file
+    # per ingestion event instead of deep partition folders plus manifests.
+    filename = (
+        f"{ingested_at.strftime('%Y-%m-%dT%H-%M-%SZ')}"
+        f"-{sanitize_path_segment(event.resource_id)}{extension}"
+    )
+    key_segments = [segment for segment in (event.storage.prefix, event.source_id, filename) if segment]
+    base_key = "/".join(sanitize_path_segment(segment) for segment in key_segments[:-1])
+    raw_key = f"{base_key}/{filename}" if base_key else filename
     return StoragePaths(
         bucket=event.storage.bucket,
-        raw_key=f"{base_key}/payload{extension}",
-        manifest_key=f"{base_key}/manifest.json",
-    )
-
-
-def build_manifest(
-    *,
-    event: IngestionEvent,
-    fetch_result: FetchResult,
-    storage_paths: StoragePaths,
-) -> IngestionManifest:
-    return IngestionManifest(
-        source_id=event.source_id,
-        dataset_id=event.dataset_id,
-        resource_id=event.resource_id,
-        ingestion_id=event.ingestion_id,
-        requested_url=event.request.url,
-        final_url=fetch_result.final_url,
-        http_method=event.request.method,
-        http_status=fetch_result.status_code,
-        content_type=fetch_result.content_type,
-        content_length=fetch_result.content_length,
-        etag=fetch_result.etag,
-        checksum_sha256=fetch_result.checksum_sha256,
-        fetched_at=fetch_result.fetched_at,
-        raw_s3_bucket=storage_paths.bucket,
-        raw_s3_key=storage_paths.raw_key,
-        manifest_s3_key=storage_paths.manifest_key,
-        request_headers=sanitize_headers(event.request.headers),
-        response_headers=sanitize_headers(fetch_result.response_headers),
-        source_metadata=event.metadata,
+        raw_key=raw_key,
     )
 
 
@@ -113,20 +73,6 @@ class S3StorageWriter(StorageWriter):
                 f"Unable to write raw payload to s3://{storage_paths.bucket}/{storage_paths.raw_key}: {exc}"
             ) from exc
 
-    def write_manifest(self, storage_paths: StoragePaths, manifest: IngestionManifest) -> None:
-        try:
-            self._s3_client.put_object(
-                Bucket=storage_paths.bucket,
-                Key=storage_paths.manifest_key,
-                Body=json.dumps(manifest.to_dict(), sort_keys=True).encode("utf-8"),
-                ContentType="application/json",
-            )
-        except Exception as exc:  # pragma: no cover - surfaced by handler tests
-            raise StorageError(
-                f"Unable to write manifest to s3://{storage_paths.bucket}/{storage_paths.manifest_key}: {exc}"
-            ) from exc
-
-
 class FilesystemStorageWriter(StorageWriter):
     def __init__(self, root_dir: Path) -> None:
         self._root_dir = root_dir
@@ -134,11 +80,6 @@ class FilesystemStorageWriter(StorageWriter):
     def write_raw_payload(self, storage_paths: StoragePaths, fetch_result: FetchResult) -> None:
         target_path = self._root_dir / storage_paths.bucket / PurePosixPath(storage_paths.raw_key)
         self._write_bytes(target_path, fetch_result.body)
-
-    def write_manifest(self, storage_paths: StoragePaths, manifest: IngestionManifest) -> None:
-        target_path = self._root_dir / storage_paths.bucket / PurePosixPath(storage_paths.manifest_key)
-        payload = json.dumps(manifest.to_dict(), indent=2, sort_keys=True).encode("utf-8")
-        self._write_bytes(target_path, payload)
 
     def _write_bytes(self, target_path: Path, payload: bytes) -> None:
         try:
@@ -152,14 +93,6 @@ def create_storage_writer(settings: Settings) -> StorageWriter:
     if settings.storage_backend == "filesystem":
         return FilesystemStorageWriter(settings.local_output_dir)
     return S3StorageWriter(create_s3_client())
-
-
-def sanitize_headers(headers: dict[str, str]) -> dict[str, str]:
-    return {
-        header_name: header_value
-        for header_name, header_value in headers.items()
-        if header_name.lower() not in SENSITIVE_HEADERS
-    }
 
 
 def sanitize_path_segment(value: str) -> str:

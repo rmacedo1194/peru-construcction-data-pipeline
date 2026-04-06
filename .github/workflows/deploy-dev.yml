@@ -1,8 +1,9 @@
 name: Deploy Dev
 
 on:
-  # Manual dispatch is the safest default for a learning project with
-  # short-lived stacks and deliberate create-run-destroy cycles.
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:

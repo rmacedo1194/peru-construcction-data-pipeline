@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -45,7 +45,7 @@ class IngestionRequest:
 @dataclass(frozen=True)
 class StorageTarget:
     bucket: str
-    prefix: str = "raw"
+    prefix: str = ""
 
 
 @dataclass(frozen=True)
@@ -129,33 +129,6 @@ class FetchResult:
 class StoragePaths:
     bucket: str
     raw_key: str
-    manifest_key: str
-
-
-@dataclass(frozen=True)
-class IngestionManifest:
-    source_id: str
-    dataset_id: str
-    resource_id: str
-    ingestion_id: str
-    requested_url: str
-    final_url: str
-    http_method: str
-    http_status: int
-    content_type: str | None
-    content_length: int | None
-    etag: str | None
-    checksum_sha256: str
-    fetched_at: str
-    raw_s3_bucket: str
-    raw_s3_key: str
-    manifest_s3_key: str
-    request_headers: dict[str, str] = field(default_factory=dict)
-    response_headers: dict[str, str] = field(default_factory=dict)
-    source_metadata: dict[str, Any] = field(default_factory=dict)
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def parse_ingestion_id(value: str) -> datetime:
